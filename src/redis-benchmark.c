@@ -473,6 +473,7 @@ static void benchmark(char *title, char *cmd, int len) {
     config.totlatency = mstime()-config.start;
 
     showLatencyReport();
+    outputFile();
     freeAllClients();
 }
 
@@ -643,6 +644,39 @@ int test_is_selected(char *name) {
     buf[l+1] = ',';
     buf[l+2] = '\0';
     return strstr(config.tests,buf) != NULL;
+}
+
+void outputFile(){
+    FILE *fp;
+    int i, curlat = 0;
+    float perc, reqpersec;
+    fp = fopen("/home/ec2-user/output/test.txt","w+");
+
+    reqpersec = (float)config.requests_finished/((float)config.totlatency/1000);
+    if (!config.quiet && !config.csv) {
+        fprintf("====== %s ======\n", config.title);
+        fprintf("  %d requests completed in %.2f seconds\n", config.requests_finished,
+            (float)config.totlatency/1000);
+        fprintf("  %d parallel clients\n", config.numclients);
+        fprintf("  %d bytes payload\n", config.datasize);
+        fprintf("  keep alive: %d\n", config.keepalive);
+        fprintf("\n");
+
+        qsort(config.latency,config.requests,sizeof(long long),compareLatency);
+        for (i = 0; i < config.requests; i++) {
+            if (config.latency[i]/1000 != curlat || i == (config.requests-1)) {
+                curlat = config.latency[i]/1000;
+                perc = ((float)(i+1)*100)/config.requests;
+                fprintf("%.2f%% <= %d milliseconds\n", perc, curlat);
+            }
+        }
+        fprintf("%.2f requests per second\n\n", reqpersec);
+    } else if (config.csv) {
+        fprintf("\"%s\",\"%.2f\"\n", config.title, reqpersec);
+    } else {
+        fprintf("%s: %.2f requests per second\n", config.title, reqpersec);
+    }
+    fclose(fp);
 }
 
 int main(int argc, const char **argv) {
